@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StrataRoute — Marathon GPX to Instagram Story Layer Studio</title>
+  <meta name="description" content="Transform smartwatch GPX race files into stylized marathon route maps with cultural landmarks and points of interest for Instagram Story transparent overlays.">
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2300F2FE'><path d='M13 2L3 14h9l-1 8 10-12h-9l1-8z'/></svg>">
+</head>
+<body>
+
+  <!-- Top App Navigation -->
+  <header class="app-navbar">
+    <div class="brand">
+      <div class="brand-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="3 11 22 2 13 21 11 13 3 11"/>
+        </svg>
+      </div>
+      <div class="brand-text">
+        <h1>StrataRoute</h1>
+        <p>GPX Race Map • Instagram Story Overlay</p>
+      </div>
+    </div>
+
+    <div class="nav-actions">
+      <span class="badge-story">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
+          <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/>
+          <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/>
+        </svg>
+        Instagram Story (9:16)
+      </span>
+    </div>
+  </header>
+
+  <!-- Main Split-Screen Workspace -->
+  <main class="app-container">
+
+    <!-- Left Controls Panel -->
+    <aside class="sidebar-panel">
+
+      <!-- 1. GPX Upload & Sample Presets -->
+      <section class="panel-section">
+        <div class="section-header">
+          <span class="section-title">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            1. Course & GPX File
+          </span>
+        </div>
+
+        <div class="dropzone" id="fileDropZone" onclick="document.getElementById('gpxFileInput').click()">
+          <div class="dropzone-icon">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+          </div>
+          <div class="dropzone-text">
+            <strong>Drop GPX file from Smartwatch</strong>
+            <span>Garmin, Apple Watch, Strava, Coros, Polar (.gpx)</span>
+          </div>
+          <input type="file" id="gpxFileInput" accept=".gpx" style="display: none;" />
+        </div>
+
+        <div class="preset-container">
+          <span class="preset-label">Or test with Marathon Majors:</span>
+          <div class="preset-pills" id="presetPills">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. Race Themes & Styling -->
+      <section class="panel-section">
+        <div class="section-header">
+          <span class="section-title">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/><path d="m14.83 14.83 4.24 4.24"/><path d="m9.17 14.83-4.24 4.24"/></svg>
+            2. Route Color Scheme
+          </span>
+        </div>
+
+        <!-- Color Mode Tabs: Country Flags vs Marathon Majors -->
+        <div class="segmented-control" style="margin-bottom: 12px;">
+          <label>
+            <input type="radio" name="colorModeTab" value="country" checked />
+            <span>🌍 Country Flags (32+)</span>
+          </label>
+          <label>
+            <input type="radio" name="colorModeTab" value="majors" />
+            <span>🏆 World Majors</span>
+          </label>
+        </div>
+
+        <!-- Country Flag Selection View -->
+        <div id="countryView">
+          <!-- Active Country Banner -->
+          <div class="active-country-banner" id="activeCountryBanner">
+            <span class="active-country-flag" id="activeCountryFlag">🇬🇧</span>
+            <div class="active-country-meta">
+              <strong id="activeCountryName">United Kingdom</strong>
+              <small id="activeCountrySub">Route styled in Union Jack colors</small>
+            </div>
+            <div class="active-country-stripes" id="activeCountryStripes"></div>
+          </div>
+
+          <!-- Quick Country Pills -->
+          <div class="quick-country-row" id="quickCountries">
+            <!-- Dynamically populated -->
+          </div>
+
+          <!-- Search Input -->
+          <div class="form-group" style="margin-bottom: 8px;">
+            <input type="text" id="countrySearchInput" class="form-input" placeholder="🔍 Search country (e.g. France, Kenya, Spain)..." />
+          </div>
+
+          <!-- Country Chips Grid -->
+          <div class="country-grid" id="countryGrid">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+
+        <!-- World Majors / Creative View (hidden by default when Country tab is selected) -->
+        <div id="majorsView" style="display: none;">
+          <div class="theme-grid" id="themeGrid">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+
+        <div style="margin-top: 16px;">
+          <div class="form-group">
+            <div class="form-label">
+              <span>Route Stroke Thickness</span>
+              <span class="range-val" id="valLineWidth">9px</span>
+            </div>
+            <div class="range-slider-wrap">
+              <input type="range" id="inputLineWidth" class="range-slider" min="3" max="22" value="9" />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <div class="form-label">
+              <span>Neon Bloom / Glow Intensity</span>
+              <span class="range-val" id="valGlow">20px</span>
+            </div>
+            <div class="range-slider-wrap">
+              <input type="range" id="inputGlow" class="range-slider" min="0" max="45" value="20" />
+            </div>
+          </div>
+
+          <div class="toggle-row">
+            <span class="toggle-label">Inner Core Highlight</span>
+            <label class="toggle-switch">
+              <input type="checkbox" id="toggleCore" checked />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. Landmarks & Cultural POIs Along The Route -->
+      <section class="panel-section">
+        <div class="section-header">
+          <span class="section-title">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            3. Landmarks & Points of Interest
+          </span>
+        </div>
+
+        <div class="landmarks-toolbar">
+          <button class="btn-secondary btn-cyan" id="discoverOsmBtn" title="Scan OpenStreetMap along the track for cultural attractions">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            Auto-Discover Landmarks (OSM)
+          </button>
+          <button class="btn-secondary" id="addLandmarkBtn" title="Add a custom landmark badge">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Add Custom
+          </button>
+        </div>
+
+        <div class="landmark-list" id="landmarkList">
+          <!-- Dynamically populated -->
+        </div>
+      </section>
+
+      <!-- 4. Story Layout & Details -->
+      <section class="panel-section">
+        <div class="section-header">
+          <span class="section-title">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+            4. Story Card & Runner Info
+          </span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Race / Event Title</label>
+          <input type="text" id="inputRaceTitle" class="form-input" value="LONDON MARATHON" placeholder="e.g. BOSTON MARATHON" />
+        </div>
+
+        <div class="form-group" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+          <div>
+            <label class="form-label">Runner Name</label>
+            <input type="text" id="inputRunnerName" class="form-input" value="Alex Morgan" placeholder="Your Name" />
+          </div>
+          <div>
+            <label class="form-label">Bib Number</label>
+            <input type="text" id="inputBibNumber" class="form-input" value="BIB 14920" placeholder="BIB 12345" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Story Subtitle / Badge</label>
+          <input type="text" id="inputSubtitle" class="form-input" value="OFFICIAL FINISHER • 42.195 KM" />
+        </div>
+
+        <!-- Background Mode Switch -->
+        <div class="form-group">
+          <label class="form-label">Preview Background & Export Mode</label>
+          <div class="segmented-control">
+            <label>
+              <input type="radio" name="bgMode" value="transparent" checked />
+              <span>Transparent</span>
+            </label>
+            <label>
+              <input type="radio" name="bgMode" value="dark_grid" />
+              <span>Dark Grid</span>
+            </label>
+            <label>
+              <input type="radio" name="bgMode" value="custom_photo" />
+              <span>My Photo</span>
+            </label>
+          </div>
+          <input type="file" id="customPhotoInput" accept="image/*" style="display: none;" />
+        </div>
+
+        <!-- Metric vs Imperial -->
+        <div class="form-group">
+          <label class="form-label">Unit System</label>
+          <div class="segmented-control">
+            <label>
+              <input type="radio" name="unitSystem" value="metric" checked />
+              <span>KM (Metric)</span>
+            </label>
+            <label>
+              <input type="radio" name="unitSystem" value="imperial" />
+              <span>Miles (Imperial)</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Route Scale & Position Tuning -->
+        <div class="form-group">
+          <div class="form-label">
+            <span>Route Scale / Zoom</span>
+            <span class="range-val" id="valScale">100%</span>
+          </div>
+          <div class="range-slider-wrap">
+            <input type="range" id="inputScale" class="range-slider" min="0.5" max="1.8" step="0.05" value="1.0" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <div class="form-label">
+            <span>Vertical Offset</span>
+            <span class="range-val" id="valOffsetY">0px</span>
+          </div>
+          <div class="range-slider-wrap">
+            <input type="range" id="inputOffsetY" class="range-slider" min="-300" max="300" step="10" value="0" />
+          </div>
+        </div>
+
+        <!-- Toggles -->
+        <div class="toggle-row">
+          <span class="toggle-label">Split Markers (KM / Mile)</span>
+          <label class="toggle-switch">
+            <input type="checkbox" id="toggleSplits" checked />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <div class="toggle-row">
+          <span class="toggle-label">Elevation Profile Strip</span>
+          <label class="toggle-switch">
+            <input type="checkbox" id="toggleElevation" checked />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <div class="toggle-row">
+          <span class="toggle-label">Bottom Race Stats HUD</span>
+          <label class="toggle-switch">
+            <input type="checkbox" id="toggleStats" checked />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <div class="toggle-row">
+          <span class="toggle-label">Instagram Safe-Zones (Guides)</span>
+          <label class="toggle-switch">
+            <input type="checkbox" id="toggleSafeZones" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </section>
+
+    </aside>
+
+    <!-- Right Live Interactive Stage -->
+    <main class="stage-panel">
+
+      <!-- Stage Top Spec Bar -->
+      <div class="stage-toolbar">
+        <div class="story-specs">
+          <span class="badge-story">Instagram Story</span>
+          <span class="badge-res">1080 × 1920 PX • 9:16</span>
+        </div>
+
+        <div class="stage-hud" id="stageHud">
+          <div class="hud-item">
+            <span class="hud-label">Distance</span>
+            <span class="hud-value" id="hudDist">42.2 km</span>
+          </div>
+          <div class="hud-item">
+            <span class="hud-label">Time</span>
+            <span class="hud-value" id="hudTime">3:24:18</span>
+          </div>
+          <div class="hud-item">
+            <span class="hud-label">Avg Pace</span>
+            <span class="hud-value" id="hudPace">4:50 /km</span>
+          </div>
+          <div class="hud-item">
+            <span class="hud-label">Elev Gain</span>
+            <span class="hud-value" id="hudEle">+185 m</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Phone Frame Viewport -->
+      <div class="stage-viewport">
+        <div class="phone-frame">
+          <div class="phone-notch"></div>
+          <div class="phone-screen checkerboard-bg" id="storyPreviewWrapper">
+            <canvas id="storyCanvas" width="1080" height="1920"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stage Footer / Export Toolbar -->
+      <footer class="stage-footer">
+        <button class="btn-primary" id="downloadPngBtn" title="Download transparent 1080x1920 PNG layer">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Download PNG Layer (1080×1920)
+        </button>
+
+        <button class="btn-action" id="copyClipboardBtn" title="Copy PNG image to clipboard to paste directly into Instagram Story!">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          Copy to Clipboard
+        </button>
+
+        <button class="btn-action" id="downloadSvgBtn" title="Download vector SVG route">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
+          Vector SVG
+        </button>
+      </footer>
+
+    </main>
+
+  </main>
+
+  <!-- Modal: Add Custom Landmark -->
+  <div class="modal-backdrop" id="landmarkModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Add Landmark or Cultural POI</h3>
+        <button class="modal-close" id="closeModalBtn">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Landmark Title</label>
+        <input type="text" id="modalLmName" class="form-input" placeholder="e.g. Tower Bridge, Cheer Zone, Heartbreak Hill" />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Select Icon Category</label>
+        <div class="icon-picker-grid" id="iconPicker">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Position Along Route (% from Start)</label>
+        <input type="range" id="modalLmPos" class="range-slider" min="0" max="100" value="50" />
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="document.getElementById('landmarkModal').classList.remove('open')">Cancel</button>
+        <button class="btn-primary" id="saveLandmarkBtn">Add to Map</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div class="toast" id="toast">Notification message</div>
+
+  <!-- Application Logic Scripts -->
+  <script src="js/gpx-parser.js"></script>
+  <script src="js/presets.js"></script>
+  <script src="js/poi-service.js"></script>
+  <script src="js/renderer.js"></script>
+  <script src="js/app.js"></script>
+
+</body>
+</html>
