@@ -107,8 +107,96 @@ class POIService {
   }
 
   /**
+   * Helper to deduce the best matching SVG icon from name, type, and tags
+   */
+  static deduceIcon(name = '', type = '', tags = {}) {
+    const s = `${name} ${type} ${tags.tourism || ''} ${tags.historic || ''} ${tags.man_made || ''}`.toLowerCase();
+    if (s.includes('obelisc') || s.includes('obelisk') || s.includes('monument') || s.includes('statue') || s.includes('memorial')) return 'landmark';
+    if (s.includes('bridge') || s.includes('puente') || s.includes('pont') || s.includes('brücke')) return 'bridge';
+    if (s.includes('tower') || s.includes('torre') || s.includes('clock') || s.includes('campanile')) return 'clock';
+    if (s.includes('palace') || s.includes('castle') || s.includes('cathedral') || s.includes('catedral') || s.includes('iglesia') || s.includes('basilica') || s.includes('temple') || s.includes('casa rosada')) return 'castle';
+    if (s.includes('park') || s.includes('parque') || s.includes('garden') || s.includes('jardin') || s.includes('plaza')) return 'park';
+    if (s.includes('hill') || s.includes('mountain') || s.includes('mont') || s.includes('cerro') || s.includes('colina')) return 'mountain';
+    if (s.includes('stadium') || s.includes('arena') || s.includes('estadio') || s.includes('cancha') || s.includes('bombonera')) return 'trophy';
+    if (s.includes('water') || s.includes('river') || s.includes('rio') || s.includes('lake') || s.includes('darsena') || s.includes('puerto') || s.includes('bay')) return 'water';
+    if (s.includes('viewpoint') || s.includes('mirador') || s.includes('camera') || s.includes('photo')) return 'camera';
+    if (s.includes('cheer') || s.includes('party')) return 'cheer';
+    if (s.includes('beer') || s.includes('pub') || s.includes('bar')) return 'beer';
+    return 'landmark';
+  }
+
+  /**
+   * Search any landmark worldwide using OpenStreetMap Nominatim API,
+   * biased to the race's geographic bounding box, and snap to the runner's course line.
+   */
+  async searchNominatim(query, bounds, points) {
+    if (!query || query.trim().length < 2) return [];
+
+    const { minLat, maxLat, minLon, maxLon } = bounds || { minLat: -90, maxLat: 90, minLon: -180, maxLon: 180 };
+    // Bounding box buffer for search bias
+    const south = Math.max(-90, minLat - 0.15);
+    const north = Math.min(90, maxLat + 0.15);
+    const west = Math.max(-180, minLon - 0.15);
+    const east = Math.min(180, maxLon + 0.15);
+
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query.trim())}&format=json&viewbox=${west},${north},${east},${south}&bounded=0&limit=6&addressdetails=1`;
+
+    try {
+      const resp = await fetch(url, {
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
+
+      if (!resp.ok) {
+        throw new Error(`Nominatim HTTP ${resp.status}`);
+      }
+
+      const results = await resp.json();
+      if (!results || results.length === 0) return [];
+
+      return results.map(item => {
+        const lat = parseFloat(item.lat);
+        const lon = parseFloat(item.lon);
+        
+        // Find nearest point on runner route
+        const nearest = points && points.length > 0 ? GPXParser.findNearestTrackPoint(lat, lon, points) : { distKm: 0, offsetKm: 0, point: { lat, lon } };
+
+        // Clean friendly display name
+        const parts = (item.display_name || '').split(',');
+        const shortTitle = item.name || parts[0] || 'Landmark';
+        const contextStr = parts.slice(1, 3).join(',').trim();
+        const deducedIcon = POIService.deduceIcon(shortTitle, item.type, {});
+
+        return {
+          id: 'search_' + item.osm_id + '_' + Date.now(),
+          name: shortTitle,
+          fullAddress: contextStr,
+          lat: lat,
+          lon: lon,
+          // Pin snaps to exact runner trajectory point on course
+          routeLat: nearest.point.lat,
+          routeLon: nearest.point.lon,
+          distFromStartKm: nearest.distKm,
+          distFromStartMile: nearest.distKm * 0.621371,
+          offsetKm: nearest.offsetKm,
+          desc: `${(nearest.distKm * 0.621371).toFixed(1)} MI • ${shortTitle.toUpperCase()}`,
+          icon: deducedIcon,
+          active: true,
+          isCustom: true,
+          offsetDx: 0,
+          offsetDy: 0
+        };
+      });
+    } catch (err) {
+      console.warn('Nominatim search error:', err);
+      return [];
+    }
+  }
+
+  /**
    * Automatically fetch cultural landmarks and attractions from OpenStreetMap Overpass API
-   * along the route's bounding box and snap to course within ~400m
+   * along the route, scoring and filtering for the top 5-8 major cultural highlights.
    */
   async discoverNearbyLandmarksOSM(bounds, points) {
     const { minLat, maxLat, minLon, maxLon } = bounds;
@@ -119,17 +207,17 @@ class POIService {
     const west = Math.max(-180, minLon - 0.008);
     const east = Math.min(180, maxLon + 0.008);
 
+    // Query nodes, ways, and relations for famous landmarks, obelisks, monuments, and bridges
     const query = `
-      [out:json][timeout:15];
+      [out:json][timeout:20];
       (
-        node["tourism"="attraction"](${south},${west},${north},${east});
-        node["historic"="monument"](${south},${west},${north},${east});
-        node["historic"="castle"](${south},${west},${north},${east});
-        node["bridge"="yes"]["name"](${south},${west},${north},${east});
-        node["tourism"="viewpoint"](${south},${west},${north},${east});
-        node["leisure"="park"]["name"](${south},${west},${north},${east});
+        nwr["man_made"="obelisk"](${south},${west},${north},${east});
+        nwr["tourism"="attraction"](${south},${west},${north},${east});
+        nwr["historic"~"^(monument|memorial|castle|archaeological_site|palace)$"](${south},${west},${north},${east});
+        nwr["bridge"="yes"]["name"](${south},${west},${north},${east});
+        nwr["tourism"="viewpoint"](${south},${west},${north},${east});
       );
-      out 40;
+      out center 75;
     `;
 
     try {
@@ -148,54 +236,72 @@ class POIService {
         return [];
       }
 
-      const discovered = [];
+      const candidates = [];
       const seenNames = new Set(this.landmarks.map(l => l.name.toLowerCase()));
 
       for (const el of data.elements) {
         const name = el.tags?.name;
-        if (!name || seenNames.has(name.toLowerCase())) continue;
+        if (!name || name.trim().length < 3 || seenNames.has(name.toLowerCase())) continue;
 
-        // Check proximity to route
-        const nearest = GPXParser.findNearestTrackPoint(el.lat, el.lon, points);
-        // Only keep if within 450m of route
-        if (nearest.offsetKm <= 0.45) {
-          seenNames.add(name.toLowerCase());
-          
-          let icon = 'landmark';
-          if (el.tags?.bridge) icon = 'bridge';
-          else if (el.tags?.historic === 'castle') icon = 'castle';
-          else if (el.tags?.historic === 'monument') icon = 'landmark';
-          else if (el.tags?.leisure === 'park') icon = 'park';
-          else if (el.tags?.tourism === 'viewpoint') icon = 'camera';
+        // Use element coordinates or center for ways/relations
+        const lat = el.lat !== undefined ? el.lat : el.center?.lat;
+        const lon = el.lon !== undefined ? el.lon : el.center?.lon;
+        if (lat === undefined || lon === undefined) continue;
 
-          discovered.push({
-            id: 'osm_' + el.id,
-            lat: el.lat,
-            lon: el.lon,
-            routeLat: nearest.point.lat,
-            routeLon: nearest.point.lon,
-            name: name,
-            desc: el.tags?.tourism || el.tags?.historic || 'Landmark',
-            icon: icon,
-            distFromStartKm: nearest.distKm,
-            distFromStartMile: nearest.distKm * 0.621371,
-            active: true,
-            isCustom: false,
-            offsetDx: 0,
-            offsetDy: 0
-          });
-        }
+        // Check proximity to route (within 400m)
+        const nearest = GPXParser.findNearestTrackPoint(lat, lon, points);
+        if (nearest.offsetKm > 0.40) continue;
+
+        // Cultural Prominence Scoring System
+        let score = 10;
+        if (el.tags?.wikipedia) score += 25; // Global renown
+        if (el.tags?.wikidata) score += 15;
+        if (el.tags?.man_made === 'obelisk') score += 30; // High iconic priority
+        if (el.tags?.historic === 'monument' || el.tags?.historic === 'memorial') score += 15;
+        if (el.tags?.tourism === 'attraction') score += 15;
+        if (el.tags?.bridge) score += 10;
+
+        // Proximity bonus (closer to runner path = higher ranking)
+        score += Math.max(0, 10 - nearest.offsetKm * 25);
+
+        const icon = POIService.deduceIcon(name, el.tags?.tourism || el.tags?.historic || '', el.tags);
+
+        seenNames.add(name.toLowerCase());
+        candidates.push({
+          id: 'osm_' + el.id,
+          lat: lat,
+          lon: lon,
+          // Pin anchors to the exact runner trajectory point on course
+          routeLat: nearest.point.lat,
+          routeLon: nearest.point.lon,
+          name: name,
+          desc: el.tags?.tourism || el.tags?.historic || 'Cultural Highlight',
+          icon: icon,
+          distFromStartKm: nearest.distKm,
+          distFromStartMile: nearest.distKm * 0.621371,
+          offsetKm: nearest.offsetKm,
+          score: score,
+          active: true,
+          isCustom: false,
+          offsetDx: 0,
+          offsetDy: 0
+        });
       }
+
+      if (candidates.length === 0) return [];
+
+      // Sort by prominence score descending and pick Top 6-8
+      candidates.sort((a, b) => b.score - a.score);
+      const topHighlights = candidates.slice(0, 7);
+
+      // Re-sort the top 6-8 in sequential course order (Start to Finish)
+      topHighlights.sort((a, b) => a.distFromStartKm - b.distFromStartKm);
 
       // Add discovered to landmarks
-      if (discovered.length > 0) {
-        // Sort by distance from start
-        discovered.sort((a, b) => a.distFromStartKm - b.distFromStartKm);
-        this.landmarks = [...this.landmarks, ...discovered];
-        this.notify();
-      }
+      this.landmarks = [...this.landmarks, ...topHighlights];
+      this.notify();
 
-      return discovered;
+      return topHighlights;
     } catch (err) {
       console.warn('OSM POI discovery query error or network limit:', err);
       return [];

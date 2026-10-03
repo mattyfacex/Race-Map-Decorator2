@@ -19,6 +19,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   const customPhotoInput = document.getElementById('customPhotoInput');
   const toastEl = document.getElementById('toast');
 
+  // Landmark Search Bar Elements
+  const poiSearchInput = document.getElementById('poiSearchInput');
+  const poiSearchBtn = document.getElementById('poiSearchBtn');
+  const poiSearchResults = document.getElementById('poiSearchResults');
+
   // Export Buttons
   const downloadPngBtn = document.getElementById('downloadPngBtn');
   const copyClipboardBtn = document.getElementById('copyClipboardBtn');
@@ -395,7 +400,95 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   };
 
-  // Discover OSM Landmarks Button
+  // Direct Landmark Search (Nominatim Geocoding & Course Snapping)
+  const handlePoiSearch = async () => {
+    const query = poiSearchInput.value.trim();
+    if (!query) {
+      poiSearchResults.style.display = 'none';
+      return;
+    }
+    if (!currentRaceData) {
+      showToast('Please load or upload a GPX route first', 'warning');
+      return;
+    }
+
+    poiSearchBtn.disabled = true;
+    poiSearchBtn.innerHTML = `<span class="spinner"></span>`;
+    poiSearchResults.style.display = 'block';
+    poiSearchResults.innerHTML = `<div style="text-align: center; color: var(--text-dim); font-size: 11px; padding: 10px;">Searching landmarks around course...</div>`;
+
+    try {
+      const results = await poiService.searchNominatim(query, currentRaceData.bounds, currentRaceData.points);
+      
+      if (results.length === 0) {
+        poiSearchResults.innerHTML = `<div style="text-align: center; color: var(--text-dim); font-size: 11px; padding: 12px;">No landmarks found for "${query}". Try another spelling.</div>`;
+        return;
+      }
+
+      poiSearchResults.innerHTML = '';
+      const isImperial = renderer.options.unitSystem === 'imperial';
+
+      results.forEach(res => {
+        const item = document.createElement('div');
+        item.className = 'poi-result-item';
+
+        const iconSvg = POIService.ICONS[res.icon] || POIService.ICONS.landmark;
+        const distStr = isImperial 
+          ? `${res.distFromStartMile.toFixed(1)} mi` 
+          : `${res.distFromStartKm.toFixed(1)} km`;
+        const offsetM = Math.round(res.offsetKm * 1000);
+        const offsetStr = offsetM < 35 ? 'On Course' : `${offsetM}m from course`;
+
+        item.innerHTML = `
+          <div class="poi-result-left">
+            <div class="lm-icon-badge">${iconSvg}</div>
+            <div class="poi-result-info">
+              <span class="poi-result-title">${res.name}</span>
+              <span class="poi-result-sub">${distStr} mark • ${offsetStr}</span>
+            </div>
+          </div>
+          <button type="button" class="btn-add-result">+ Add</button>
+        `;
+
+        const addBtn = item.querySelector('.btn-add-result');
+        addBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          poiService.landmarks.push(res);
+          poiService.notify();
+          renderer.setLandmarks(poiService.getLandmarks());
+          renderLandmarksUI();
+          poiSearchResults.style.display = 'none';
+          poiSearchInput.value = '';
+          showToast(`Added "${res.name}" at ${distStr} mark!`, 'success');
+        });
+
+        poiSearchResults.appendChild(item);
+      });
+    } catch (err) {
+      console.error(err);
+      poiSearchResults.innerHTML = `<div style="text-align: center; color: #EF4444; font-size: 11px; padding: 10px;">Search error. Check network connection.</div>`;
+    } finally {
+      poiSearchBtn.disabled = false;
+      poiSearchBtn.textContent = 'Search';
+    }
+  };
+
+  poiSearchBtn.addEventListener('click', handlePoiSearch);
+  poiSearchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handlePoiSearch();
+    }
+  });
+
+  // Close search results if clicked outside
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.poi-search-box')) {
+      poiSearchResults.style.display = 'none';
+    }
+  });
+
+  // Discover OSM Landmarks Button (Top 5-8 Highlights)
   discoverOsmBtn.addEventListener('click', async () => {
     if (!currentRaceData) {
       showToast('Please load or upload a GPX route first', 'warning');
@@ -403,18 +496,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     discoverOsmBtn.disabled = true;
-    discoverOsmBtn.innerHTML = `<span class="spinner"></span> Querying OpenStreetMap...`;
+    discoverOsmBtn.innerHTML = `<span class="spinner"></span> Scanning top highlights...`;
 
     try {
-      showToast('Scanning course for cultural landmarks & bridges...', 'info');
+      showToast('Scanning course for top cultural highlights & monuments...', 'info');
       const found = await poiService.discoverNearbyLandmarksOSM(currentRaceData.bounds, currentRaceData.points);
       
       if (found.length > 0) {
-        showToast(`Discovered ${found.length} cultural landmarks along the route!`, 'success');
+        showToast(`Discovered top ${found.length} cultural highlights along the course!`, 'success');
         renderer.setLandmarks(poiService.getLandmarks());
         renderLandmarksUI();
       } else {
-        showToast('No new cultural landmarks found within 400m of the track.', 'info');
+        showToast('No prominent highlights found. Use the search bar to find landmarks!', 'info');
       }
     } catch (err) {
       console.error(err);
@@ -423,7 +516,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       discoverOsmBtn.disabled = false;
       discoverOsmBtn.innerHTML = `
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        Auto-Discover Landmarks (OSM)
+        Auto-Discover Top Highlights
       `;
     }
   });
